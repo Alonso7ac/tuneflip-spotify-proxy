@@ -23,8 +23,16 @@ function flattenMusic(node, path = []) {
 }
 
 export default async function handler(req, res) {
+  // Disable CDN/browser caching completely
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const r = await fetch(APPLE_GENRES_URL, { cache: 'no-store' });
+    if (!r.ok) {
+      return res.status(502).json({ ok: false, error: `Upstream HTTP ${r.status}` });
+    }
     const json = await r.json();
 
     // Music root is usually id "34". If missing, fall back by name.
@@ -45,11 +53,10 @@ export default async function handler(req, res) {
       label: g.path.join(' ▸ '), // e.g. "Music ▸ Rock ▸ Classic Rock"
     }));
 
-    // (Optional) cache for an hour at the edge/CDN
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=300');
-
     return res.status(200).json({ ok: true, items: flat });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
+    return res
+      .status(500)
+      .json({ ok: false, error: String(e?.message ?? e) });
   }
 }
