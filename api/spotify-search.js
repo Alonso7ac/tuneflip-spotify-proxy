@@ -1,11 +1,14 @@
 // /api/spotify-search.js
 export default async function handler(req, res) {
   try {
-    const url = new URL(req.url || `http://x${req.headers.host}${req.originalUrl || ''}`);
-    const q = url.searchParams.get('q') || 'classic rock';
-    const limit = Number(url.searchParams.get('limit') || 12);
-    const market = (url.searchParams.get('market') || 'US').toUpperCase();
-    const playableOnly = url.searchParams.get('playable') === 'true';
+    // Parse query string safely (works on Vercel without a full URL)
+    const qs = (req?.url || '').split('?')[1] || '';
+    const params = new URLSearchParams(qs);
+
+    const q = params.get('q') || 'classic rock';
+    const limit = Number(params.get('limit') || 12);
+    const market = (params.get('market') || 'US').toUpperCase();
+    const playableOnly = params.get('playable') === 'true';
 
     // 1) Try SPOTIFY first
     const spotifyItems = await searchSpotify({ q, limit, market, playableOnly });
