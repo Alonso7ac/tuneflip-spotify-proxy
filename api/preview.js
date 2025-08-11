@@ -56,29 +56,35 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const debug = req.query.debug === '1';
+  const dbg = [];
+
   try {
-    const title = (req.query.title || '').toString().trim();
+    const title  = (req.query.title  || '').toString().trim();
     const artist = (req.query.artist || '').toString().trim();
-    const album = (req.query.album || '').toString().trim();
-    const isrc = (req.query.isrc || '').toString().trim();
+    const album  = (req.query.album  || '').toString().trim();
+    const isrc   = (req.query.isrc   || '').toString().trim();
 
     if (!title && !artist && !isrc) {
       return res.status(400).json({ error: 'Provide at least title or artist or isrc' });
     }
 
-    // Try chain
     const ctx = { title, artist, album, isrc };
-    const order = [tryDeezer, tryNapster, tryITunes];
-    for (const fn of order) {
+    const order = [{name:'deezer', fn: tryDeezer}, {name:'napster', fn: tryNapster}, {name:'itunes', fn: tryITunes}];
+
+    for (const {name, fn} of order) {
       try {
         const r = await fn(ctx);
-        if (r && r.url) return res.status(200).json(r);
-      } catch (_) { /* continue */ }
+        if (debug) dbg.push({ step: name, ok: !!(r && r.url) });
+        if (r && r.url) return res.status(200).json(debug ? { ...r, debug: dbg } : r);
+      } catch (e) {
+        if (debug) dbg.push({ step: name, error: String(e.message || e) });
+      }
     }
 
-    res.status(404).json({ error: 'No preview found' });
+    return res.status(404).json(debug ? { error: 'No preview found', debug: dbg } : { error: 'No preview found' });
   } catch (e) {
-    res.status(500).json({ error: e.message || 'Server error' });
+    return res.status(500).json(debug ? { error: e.message || 'Server error', debug: dbg } : { error: e.message || 'Server error' });
   }
 };
 
