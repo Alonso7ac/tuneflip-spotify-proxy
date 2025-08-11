@@ -78,7 +78,7 @@ module.exports = async (req, res) => {
         if (debug) dbg.push({ step: name, ok: !!(r && r.url) });
         if (r && r.url) return res.status(200).json(debug ? { ...r, debug: dbg } : r);
       } catch (e) {
-        if (debug) dbg.push({ step: name, error: String(e.message || e) });
+        if (debug) dbg.push({ step: name, error: String(e && e.message ? e.message : e) });
       }
     }
 
