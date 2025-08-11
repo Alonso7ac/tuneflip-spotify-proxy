@@ -4,6 +4,12 @@
 // Inputs: isrc (optional), artist (optional), title (optional), album (optional)
 // Env vars (optional): NAPSTER_API_KEY
 
+const fetchJson = async (url, options = {}) => {
+  const res = await fetch(url, { ...options });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
 const tryDeezer = async ({ artist, title }) => {
   const queries = [];
   if (artist && title) {
