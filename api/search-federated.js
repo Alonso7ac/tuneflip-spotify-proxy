@@ -149,19 +149,21 @@ module.exports = async (req, res) => {
     const limit = parseInt(req.query.limit || '20', 10);
     if (!q) return res.status(400).json({ error: 'Missing q' });
 
-    const [sp, it, yt, mb] = await Promise.allSettled([
-      searchSpotify(q, limit),
-      searchITunes(q, limit),
-      searchYouTube(q, Math.min(6, limit)),
-      searchMusicBrainz(q, Math.min(6, limit))
-    ]);
+    const [yt, sp, it, mb] = await Promise.allSettled([
+  searchYouTube(q, Math.min(6, limit)),
+  searchSpotify(q, limit),
+  searchITunes(q, limit),
+  searchMusicBrainz(q, Math.min(6, limit))
+]);
+
 
     const results = dedupeMerge([
-      sp.status === 'fulfilled' ? sp.value : [],
-      it.status === 'fulfilled' ? it.value : [],
-      yt.status === 'fulfilled' ? yt.value : [],
-      mb.status === 'fulfilled' ? mb.value : []
-    ]).slice(0, limit);
+  yt.status === 'fulfilled' ? yt.value : [],
+  sp.status === 'fulfilled' ? sp.value : [],
+  it.status === 'fulfilled' ? it.value : [],
+  mb.status === 'fulfilled' ? mb.value : []
+]).slice(0, limit);
+
 
     res.status(200).json({ q, results });
   } catch (e) {
