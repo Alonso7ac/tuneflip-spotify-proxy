@@ -1,7 +1,6 @@
-﻿import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { pool } from "../lib/db";
+﻿import { pool } from "../lib/db";
+export default async function handler(req: any, res: any) {
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   const wantAuth = !!process.env.INGEST_KEY;
@@ -30,7 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           String(e.type),
           e.track_id ? String(e.track_id) : null,
           Number(e.ts),
-          e,
+          JSON.stringify(e),
+
         ]
       );
       inserted++;
