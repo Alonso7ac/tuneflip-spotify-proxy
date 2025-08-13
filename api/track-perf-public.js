@@ -1,7 +1,6 @@
 // api/track-perf-public.js
 import { pool } from "../lib/db";
 
-// READ-ONLY public view for the app (no auth). Uses the same Neon view.
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Cache-Control", "no-store");
@@ -29,7 +28,7 @@ export default async function handler(req, res) {
         v.avg_play_ratio,
         v.score
       FROM public.v_track_perf_7d v
-      LEFT JOIN public.tracks t ON t.track_id = v.track_id
+      LEFT JOIN public.tracks t ON t.track_id::text = v.track_id::text
       ORDER BY v.score DESC
       LIMIT $1
     `;
@@ -42,3 +41,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
