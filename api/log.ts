@@ -19,7 +19,7 @@ function extractTrackMeta(body: any) {
   const art_url = upscaleArt(
     src.art_url ?? src.artUrl ?? src.artworkUrl600 ?? src.artworkUrl100 ?? null
   );
-  // preview_url is REQUIRED by DB (NOT NULL) — default to empty string if missing
+  // preview_url is NOT NULL in DB → default to empty string if missing
   const preview_url = String(src.preview_url ?? src.previewUrl ?? "");
 
   return { track_id, title, artist, album, art_url, preview_url };
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: "Method Not Allowed" });
     }
 
-    // lightweight auth via INGEST_KEY (same as other endpoints)
+    // lightweight auth via INGEST_KEY
     const wantAuth = !!process.env.INGEST_KEY;
     const okAuth =
       !wantAuth ||
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body: any = req.body || {};
     const meta = extractTrackMeta(body);
 
-    // Upsert metadata — includes preview_url (NOT NULL in DB)
+    // Upsert metadata (includes preview_url, which is NOT NULL)
     if (meta.track_id) {
       const upsertSQL = `
         INSERT INTO public.tracks (track_id, title, artist, album, art_url, preview_url)
@@ -66,20 +66,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         meta.artist,
         meta.album,
         meta.art_url,
-        meta.preview_url, // may be '' but not null
+        meta.preview_url,
       ]);
     }
 
-    // Insert event (adjust columns/types only if your schema differs)
+    // EVENTS INSERT: ts is BIGINT epoch ms in DB → compute epoch ms here
+    const tsMs =
+      Number.isFinite(Number(body.ts)) && String(body.ts).trim() !== ""
+        ? Number(body.ts)
+        : Date.now();
+
     const insertEventSQL = `
       INSERT INTO public.events (ts, type, session_id, track_id, payload)
-      VALUES (NOW(), $1, $2, $3, $4)
+      VALUES ($1::bigint, $2, $3, $4, $5)
     `;
     await pool.query(insertEventSQL, [
+      tsMs, // bigint epoch milliseconds
       body.type ?? "unknown",
       body.session_id ?? body.sessionId ?? null,
       meta.track_id,
-      body, // stored as JSONB
+      body, // JSONB
     ]);
 
     res.setHeader("Cache-Control", "no-store");
@@ -90,5 +96,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
 
 
