@@ -19,8 +19,10 @@ function extractTrackMeta(body: any) {
   const art_url = upscaleArt(
     src.art_url ?? src.artUrl ?? src.artworkUrl600 ?? src.artworkUrl100 ?? null
   );
+  // preview_url is REQUIRED by DB (NOT NULL) — default to empty string if missing
+  const preview_url = String(src.preview_url ?? src.previewUrl ?? "");
 
-  return { track_id, title, artist, album, art_url };
+  return { track_id, title, artist, album, art_url, preview_url };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -43,20 +45,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Body should already be JSON if Content-Type: application/json
     const body: any = req.body || {};
     const meta = extractTrackMeta(body);
 
-    // Upsert minimal metadata into public.tracks (only columns that exist)
+    // Upsert metadata — includes preview_url (NOT NULL in DB)
     if (meta.track_id) {
       const upsertSQL = `
-        INSERT INTO public.tracks (track_id, title, artist, album, art_url)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO public.tracks (track_id, title, artist, album, art_url, preview_url)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (track_id) DO UPDATE SET
           title = COALESCE(EXCLUDED.title, public.tracks.title),
           artist = COALESCE(EXCLUDED.artist, public.tracks.artist),
           album = COALESCE(EXCLUDED.album, public.tracks.album),
-          art_url = COALESCE(EXCLUDED.art_url, public.tracks.art_url)
+          art_url = COALESCE(EXCLUDED.art_url, public.tracks.art_url),
+          preview_url = COALESCE(NULLIF(EXCLUDED.preview_url, ''), public.tracks.preview_url)
       `;
       await pool.query(upsertSQL, [
         meta.track_id,
@@ -64,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         meta.artist,
         meta.album,
         meta.art_url,
+        meta.preview_url, // may be '' but not null
       ]);
     }
 
@@ -82,9 +85,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ ok: true });
   } catch (err: any) {
-    console.error("log error:", err?.message, err?.stack);
+    console.error("log error:", err);
     res.setHeader("Cache-Control", "no-store");
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
 
